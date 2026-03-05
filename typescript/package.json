@@ -1,13 +1,32 @@
 {
   "name": "ai-music-mcp",
   "version": "0.1.0",
-  "description": "AI Music MCP Server — generate music, separate stems, convert voices via MusicGen, Demucs, and RVC (8 tools)",
+  "description": "AI Music MCP Server \u2014 generate music, separate stems, convert voices via MusicGen, Demucs, and RVC (8 tools)",
   "type": "module",
   "bin": {
     "ai-music-mcp": "build/index.js"
   },
   "files": [
     "build/index.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ExpertVagabond/ai-music-mcp.git"
+  },
+  "homepage": "https://github.com/ExpertVagabond/ai-music-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/ExpertVagabond/ai-music-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "music",
+    "ai",
+    "musicgen",
+    "demucs",
+    "rvc",
+    "voice-conversion",
+    "stem-separation",
+    "model-context-protocol"
   ],
   "scripts": {
     "build": "tsc && node esbuild.config.js",
@@ -16,6 +35,9 @@
   },
   "author": "Purple Squirrel Media",
   "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",
     "zod": "^3.23.8",
@@ -25,8 +47,5 @@
     "@types/node": "^20.11.24",
     "esbuild": "^0.25.2",
     "typescript": "^5.3.3"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }

@@ -1,10 +1,16 @@
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::BufRead;
 use std::process::Command;
 
 #[derive(Deserialize)]
-struct JsonRpcRequest { #[allow(dead_code)] jsonrpc: String, id: Option<Value>, method: String, params: Option<Value> }
+struct JsonRpcRequest {
+    #[allow(dead_code)]
+    jsonrpc: String,
+    id: Option<Value>,
+    method: String,
+    params: Option<Value>,
+}
 
 struct Config {
     music_studio_dir: String,
@@ -47,7 +53,7 @@ impl Config {
     }
 }
 
-fn run_python(venv: &str, args: &[&str], cwd: &str, timeout_secs: u64) -> Result<String, String> {
+fn run_python(venv: &str, args: &[&str], cwd: &str, _timeout_secs: u64) -> Result<String, String> {
     let python = format!("{}/bin/python", venv);
     let output = Command::new(&python)
         .args(args)
@@ -59,9 +65,17 @@ fn run_python(venv: &str, args: &[&str], cwd: &str, timeout_secs: u64) -> Result
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     if output.status.success() {
-        Ok(if stderr.is_empty() { stdout } else { format!("{stdout}\n\nWarnings:\n{stderr}") })
+        Ok(if stderr.is_empty() {
+            stdout
+        } else {
+            format!("{stdout}\n\nWarnings:\n{stderr}")
+        })
     } else {
-        Err(format!("Exit {}: {}", output.status.code().unwrap_or(-1), if stdout.is_empty() { &stderr } else { &stdout }))
+        Err(format!(
+            "Exit {}: {}",
+            output.status.code().unwrap_or(-1),
+            if stdout.is_empty() { &stderr } else { &stdout }
+        ))
     }
 }
 
@@ -163,15 +177,29 @@ fn call_tool(name: &str, args: &Value, config: &Config) -> Value {
             let prompt = args["prompt"].as_str().unwrap_or("");
             let duration = args["duration"].as_i64().unwrap_or(15).to_string();
             let model = args["model"].as_str().unwrap_or("small");
-            let mut cmd_args = vec![config.musicgen_script.as_str(), prompt, "--duration", &duration, "--model", model];
+            let mut cmd_args = vec![
+                config.musicgen_script.as_str(),
+                prompt,
+                "--duration",
+                &duration,
+                "--model",
+                model,
+            ];
             let output_filename;
             if let Some(f) = args["output_filename"].as_str() {
                 output_filename = f.to_string();
                 cmd_args.push("--output");
                 cmd_args.push(&output_filename);
             }
-            match run_python(&config.musicgen_venv, &cmd_args, &config.music_studio_dir, 600) {
-                Ok(out) => format!("{}", serde_json::to_string_pretty(&json!({"status":"success","output":out})).unwrap_or_default()),
+            match run_python(
+                &config.musicgen_venv,
+                &cmd_args,
+                &config.music_studio_dir,
+                600,
+            ) {
+                Ok(out) => serde_json::to_string_pretty(&json!({"status":"success","output":out}))
+                    .unwrap_or_default()
+                    .to_string(),
                 Err(e) => format!("Error: {e}"),
             }
         }
@@ -179,41 +207,71 @@ fn call_tool(name: &str, args: &Value, config: &Config) -> Value {
             let input = args["input_audio"].as_str().unwrap_or("");
             let model = args["model"].as_str().unwrap_or("htdemucs");
             let stems = args["stems"].as_str().unwrap_or("all");
-            let cmd_args = vec![config.stems_script.as_str(), input, "--model", model, "--stems", stems, "--output-dir", &config.stems_dir];
-            match run_python(&config.musicgen_venv, &cmd_args, &config.music_studio_dir, 600) {
-                Ok(out) => format!("{}", serde_json::to_string_pretty(&json!({"status":"success","output":out})).unwrap_or_default()),
+            let cmd_args = vec![
+                config.stems_script.as_str(),
+                input,
+                "--model",
+                model,
+                "--stems",
+                stems,
+                "--output-dir",
+                &config.stems_dir,
+            ];
+            match run_python(
+                &config.musicgen_venv,
+                &cmd_args,
+                &config.music_studio_dir,
+                600,
+            ) {
+                Ok(out) => serde_json::to_string_pretty(&json!({"status":"success","output":out}))
+                    .unwrap_or_default()
+                    .to_string(),
                 Err(e) => format!("Error: {e}"),
             }
         }
-        "music_list_stems" => {
-            list_dir(&config.stems_dir)
-        }
+        "music_list_stems" => list_dir(&config.stems_dir),
         "music_convert_voice" => {
             let input = args["input_audio"].as_str().unwrap_or("");
             let model_name = args["model_name"].as_str().unwrap_or("");
             let pitch = args["pitch"].as_i64().unwrap_or(0).to_string();
             let index_rate = args["index_rate"].as_f64().unwrap_or(0.75).to_string();
             let model_path = format!("{}/{}", config.rvc_weights_dir, model_name);
-            let cmd_args = vec![config.rvc_infer_script.as_str(), input, "--model", &model_path, "--pitch", &pitch, "--index-rate", &index_rate, "--output-dir", &config.converted_dir];
+            let cmd_args = vec![
+                config.rvc_infer_script.as_str(),
+                input,
+                "--model",
+                &model_path,
+                "--pitch",
+                &pitch,
+                "--index-rate",
+                &index_rate,
+                "--output-dir",
+                &config.converted_dir,
+            ];
             match run_python(&config.rvc_venv, &cmd_args, &config.rvc_dir, 300) {
-                Ok(out) => format!("{}", serde_json::to_string_pretty(&json!({"status":"success","output":out})).unwrap_or_default()),
+                Ok(out) => serde_json::to_string_pretty(&json!({"status":"success","output":out}))
+                    .unwrap_or_default()
+                    .to_string(),
                 Err(e) => format!("Error: {e}"),
             }
         }
-        "music_list_voice_models" => {
-            match std::fs::read_dir(&config.rvc_weights_dir) {
-                Ok(entries) => {
-                    let models: Vec<String> = entries.filter_map(|e| {
+        "music_list_voice_models" => match std::fs::read_dir(&config.rvc_weights_dir) {
+            Ok(entries) => {
+                let models: Vec<String> = entries
+                    .filter_map(|e| {
                         let e = e.ok()?;
                         let n = e.file_name().to_string_lossy().to_string();
                         if n.ends_with(".pth") { Some(n) } else { None }
-                    }).collect();
-                    if models.is_empty() { "No voice models found".into() }
-                    else { format!("Voice models ({}):\n{}", models.len(), models.join("\n")) }
+                    })
+                    .collect();
+                if models.is_empty() {
+                    "No voice models found".into()
+                } else {
+                    format!("Voice models ({}):\n{}", models.len(), models.join("\n"))
                 }
-                Err(e) => format!("Cannot read models dir: {e}"),
             }
-        }
+            Err(e) => format!("Cannot read models dir: {e}"),
+        },
         "music_list_files" => {
             let sub = args["subdirectory"].as_str().unwrap_or("");
             let dir = match sub {
@@ -226,11 +284,13 @@ fn call_tool(name: &str, args: &Value, config: &Config) -> Value {
         "music_get_info" => {
             let path = args["file_path"].as_str().unwrap_or("");
             match std::fs::metadata(path) {
-                Ok(m) => format!("{}", serde_json::to_string_pretty(&json!({
+                Ok(m) => serde_json::to_string_pretty(&json!({
                     "file": path,
                     "size_bytes": m.len(),
                     "size_mb": format!("{:.1}", m.len() as f64 / 1_048_576.0),
-                })).unwrap_or_default()),
+                }))
+                .unwrap_or_default()
+                .to_string(),
                 Err(e) => format!("Error reading file: {e}"),
             }
         }
@@ -239,20 +299,46 @@ fn call_tool(name: &str, args: &Value, config: &Config) -> Value {
             let duration = args["duration"].as_i64().unwrap_or(15).to_string();
             let model = args["model"].as_str().unwrap_or("small");
             // Step 1: Generate
-            let gen_args = vec![config.musicgen_script.as_str(), prompt, "--duration", &duration, "--model", model];
-            match run_python(&config.musicgen_venv, &gen_args, &config.music_studio_dir, 600) {
+            let gen_args = vec![
+                config.musicgen_script.as_str(),
+                prompt,
+                "--duration",
+                &duration,
+                "--model",
+                model,
+            ];
+            match run_python(
+                &config.musicgen_venv,
+                &gen_args,
+                &config.music_studio_dir,
+                600,
+            ) {
                 Ok(gen_out) => {
                     let mut result = json!({"step1_generate": "success", "output": gen_out});
                     // Try to extract file path from output
-                    if let Some(voice_model) = args["voice_model"].as_str() {
-                        if let Some(cap) = gen_out.lines().find(|l| l.contains("Saved:")) {
-                            let saved_path = cap.replace("Saved:", "").trim().to_string();
-                            let pitch = args["pitch"].as_i64().unwrap_or(0).to_string();
-                            let mp = format!("{}/{}", config.rvc_weights_dir, voice_model);
-                            let conv_args = vec![config.rvc_infer_script.as_str(), &saved_path, "--model", &mp, "--pitch", &pitch, "--output-dir", &config.converted_dir];
-                            match run_python(&config.rvc_venv, &conv_args, &config.rvc_dir, 300) {
-                                Ok(conv_out) => { result["step2_voice_convert"] = json!("success"); result["convert_output"] = json!(conv_out); }
-                                Err(e) => { result["step2_voice_convert"] = json!(format!("error: {e}")); }
+                    if let Some(voice_model) = args["voice_model"].as_str()
+                        && let Some(cap) = gen_out.lines().find(|l| l.contains("Saved:"))
+                    {
+                        let saved_path = cap.replace("Saved:", "").trim().to_string();
+                        let pitch = args["pitch"].as_i64().unwrap_or(0).to_string();
+                        let mp = format!("{}/{}", config.rvc_weights_dir, voice_model);
+                        let conv_args = vec![
+                            config.rvc_infer_script.as_str(),
+                            &saved_path,
+                            "--model",
+                            &mp,
+                            "--pitch",
+                            &pitch,
+                            "--output-dir",
+                            &config.converted_dir,
+                        ];
+                        match run_python(&config.rvc_venv, &conv_args, &config.rvc_dir, 300) {
+                            Ok(conv_out) => {
+                                result["step2_voice_convert"] = json!("success");
+                                result["convert_output"] = json!(conv_out);
+                            }
+                            Err(e) => {
+                                result["step2_voice_convert"] = json!(format!("error: {e}"));
                             }
                         }
                     }
@@ -269,37 +355,56 @@ fn call_tool(name: &str, args: &Value, config: &Config) -> Value {
 fn list_dir(dir: &str) -> String {
     match std::fs::read_dir(dir) {
         Ok(entries) => {
-            let files: Vec<String> = entries.filter_map(|e| {
-                let e = e.ok()?;
-                Some(e.file_name().to_string_lossy().to_string())
-            }).collect();
-            if files.is_empty() { format!("No files in {dir}") }
-            else { format!("Files in {dir} ({}):\n{}", files.len(), files.join("\n")) }
+            let files: Vec<String> = entries
+                .filter_map(|e| {
+                    let e = e.ok()?;
+                    Some(e.file_name().to_string_lossy().to_string())
+                })
+                .collect();
+            if files.is_empty() {
+                format!("No files in {dir}")
+            } else {
+                format!("Files in {dir} ({}):\n{}", files.len(), files.join("\n"))
+            }
         }
         Err(e) => format!("Cannot read {dir}: {e}"),
     }
 }
 
 fn main() {
-    tracing_subscriber::fmt().with_env_filter("info").with_writer(std::io::stderr).init();
+    tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_writer(std::io::stderr)
+        .init();
     let config = Config::from_env();
     eprintln!("[ai-music-mcp] Starting with 8 tools");
-    eprintln!("[ai-music-mcp] MusicGen: {}, RVC: {}, Output: {}", config.music_studio_dir, config.rvc_dir, config.output_dir);
+    eprintln!(
+        "[ai-music-mcp] MusicGen: {}, RVC: {}, Output: {}",
+        config.music_studio_dir, config.rvc_dir, config.output_dir
+    );
     let stdin = std::io::stdin();
     let mut line = String::new();
     loop {
         line.clear();
-        if stdin.lock().read_line(&mut line).unwrap_or(0) == 0 { break; }
+        if stdin.lock().read_line(&mut line).unwrap_or(0) == 0 {
+            break;
+        }
         let trimmed = line.trim();
-        if trimmed.is_empty() { continue; }
+        if trimmed.is_empty() {
+            continue;
+        }
         let req: JsonRpcRequest = match serde_json::from_str(trimmed) {
             Ok(r) => r,
             Err(_) => continue,
         };
         let resp = match req.method.as_str() {
-            "initialize" => json!({"jsonrpc":"2.0","id":req.id,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"ai-music","version":"0.1.0"}}}),
+            "initialize" => {
+                json!({"jsonrpc":"2.0","id":req.id,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"ai-music","version":"0.1.0"}}})
+            }
             "notifications/initialized" => continue,
-            "tools/list" => json!({"jsonrpc":"2.0","id":req.id,"result":{"tools":tool_definitions()}}),
+            "tools/list" => {
+                json!({"jsonrpc":"2.0","id":req.id,"result":{"tools":tool_definitions()}})
+            }
             "tools/call" => {
                 let params = req.params.unwrap_or(json!({}));
                 let name = params["name"].as_str().unwrap_or("");
@@ -307,7 +412,9 @@ fn main() {
                 let result = call_tool(name, &args, &config);
                 json!({"jsonrpc":"2.0","id":req.id,"result":result})
             }
-            _ => json!({"jsonrpc":"2.0","id":req.id,"error":{"code":-32601,"message":"Method not found"}}),
+            _ => {
+                json!({"jsonrpc":"2.0","id":req.id,"error":{"code":-32601,"message":"Method not found"}})
+            }
         };
         println!("{}", serde_json::to_string(&resp).unwrap());
     }

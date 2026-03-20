@@ -4,6 +4,58 @@ use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+// ---------------------------------------------------------------------------
+// Security: Constants & limits
+// ---------------------------------------------------------------------------
+
+/// Maximum JSON-RPC request size (1 MB). Prevents memory exhaustion from
+/// oversized payloads on stdin.
+const MAX_REQUEST_SIZE: usize = 1_024 * 1_024;
+
+/// Maximum string parameter length (8 KB).
+const MAX_PARAM_LEN: usize = 8_192;
+
+/// Maximum allowed command arguments to prevent arg-list attacks.
+const MAX_ARGS: usize = 64;
+
+/// Validate a string parameter: reject null bytes, enforce length.
+fn validate_string_param(value: &str, label: &str) -> Result<(), String> {
+    if value.len() > MAX_PARAM_LEN {
+        return Err(format!("{label}: exceeds maximum length of {MAX_PARAM_LEN}"));
+    }
+    if value.contains('\0') {
+        return Err(format!("{label}: contains null bytes"));
+    }
+    Ok(())
+}
+
+/// Redact internal paths from error messages for safe external display.
+fn redact_error(msg: &str) -> String {
+    let mut s = msg.to_string();
+    // Redact absolute paths
+    while let Some(start) = s.find("/Volumes/") {
+        if let Some(end) = s[start..].find(|c: char| c.is_whitespace() || c == '"' || c == '\'') {
+            s.replace_range(start..start + end, "[redacted-path]");
+        } else {
+            s.replace_range(start.., "[redacted-path]");
+            break;
+        }
+    }
+    while let Some(start) = s.find("/Users/") {
+        if let Some(end) = s[start..].find(|c: char| c.is_whitespace() || c == '"' || c == '\'') {
+            s.replace_range(start..start + end, "[redacted-path]");
+        } else {
+            s.replace_range(start.., "[redacted-path]");
+            break;
+        }
+    }
+    if s.len() > 500 {
+        s.truncate(500);
+        s.push_str("... (truncated)");
+    }
+    s
+}
+
 #[derive(Deserialize)]
 struct JsonRpcRequest {
     #[allow(dead_code)]
@@ -561,6 +613,11 @@ fn main() {
         line.clear();
         if stdin.lock().read_line(&mut line).unwrap_or(0) == 0 {
             break;
+        }
+        // Security: reject oversized requests
+        if line.len() > MAX_REQUEST_SIZE {
+            eprintln!("[ai-music-mcp] Request exceeds {MAX_REQUEST_SIZE} bytes, skipping");
+            continue;
         }
         let trimmed = line.trim();
         if trimmed.is_empty() {

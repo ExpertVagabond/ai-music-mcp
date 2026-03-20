@@ -61,13 +61,13 @@ export function validateConfig(config: MusicConfig): void {
   const pythonBin = resolve(config.musicgenVenv, "bin/python");
   if (!existsSync(pythonBin)) {
     console.error(
-      `[ai-music-mcp] Warning: MusicGen venv not found at ${config.musicgenVenv}`
+      `[ai-music-mcp] Warning: MusicGen venv not found (check MUSIC_STUDIO_DIR)`
     );
   }
   const rvcPython = resolve(config.rvcVenv, "bin/python");
   if (!existsSync(rvcPython)) {
     console.error(
-      `[ai-music-mcp] Warning: RVC venv not found at ${config.rvcVenv}`
+      `[ai-music-mcp] Warning: RVC venv not found (check RVC_DIR)`
     );
   }
 }

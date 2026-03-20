@@ -58,9 +58,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const config = loadConfig();
 validateConfig(config);
 console.error(`[ai-music-mcp] Starting with ${actions.length} tools`);
-console.error(`[ai-music-mcp] MusicGen: ${config.musicStudioDir}`);
-console.error(`[ai-music-mcp] RVC: ${config.rvcDir}`);
-console.error(`[ai-music-mcp] Output: ${config.outputDir}`);
+console.error(`[ai-music-mcp] MusicGen: [configured]`);
+console.error(`[ai-music-mcp] RVC: [configured]`);
+console.error(`[ai-music-mcp] Output: [configured]`);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

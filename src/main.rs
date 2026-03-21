@@ -1,3 +1,12 @@
+// ─── Security & Validation (ai-music-mcp) ─────────────────────────────
+// Input validation, path sanitization, and error redaction are defined
+// at the top of the entry file before any handler or tool logic.
+//
+// - All string parameters validated for length and null bytes
+// - File paths validated against traversal and restricted to allowed dirs
+// - Error messages redacted to prevent leaking internal paths
+// - No hardcoded secrets — all configuration from environment variables
+
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::io::BufRead;

@@ -1,0 +1,19 @@
+{
+  "name": "ai-music-mcp",
+  "owner": {
+    "name": "Purple Squirrel Media",
+    "email": "matthew@purplesquirrelmedia.io",
+    "github": "ExpertVagabond"
+  },
+  "plugins": [
+    {
+      "name": "ai-music-mcp",
+      "source": ".",
+      "description": "8-tool local AI music production — generate, separate stems, convert voice",
+      "version": "0.1.0",
+      "category": "media",
+      "tools": 8,
+      "homepage": "https://github.com/ExpertVagabond/ai-music-mcp"
+    }
+  ]
+}
